@@ -46,34 +46,29 @@ function SSHExecutor:upload(localSrcPath, remoteDestPath, job_opts)
   job_opts = job_opts or {}
   job_opts.compression = job_opts.compression or {}
 
-  if job_opts.compression.enabled or false then
-    local paths = vim.split(localSrcPath, " ")
-    local parent_dir, subdirs = utils.find_common_parent(paths)
-    assert(
-      parent_dir ~= "",
-      ("All directories to be uploaded from local should share a common ancestor. Passed paths: %s"):format(
-        table.concat(paths, " ")
-      )
-    )
+  -- Ensure remote directory exists
+  local mkdir_command = self:_build_run_command(("mkdir -p %s"):format(remoteDestPath), job_opts)
+  self:run_command(mkdir_command)
 
-    local ssh_command = self:_build_run_command(
-      ("tar xvzf - -C %s && chown -R $(whoami) %s"):format(remoteDestPath, remoteDestPath),
-      job_opts
-    )
-    local tar_command = ("tar czf - --no-xattrs %s %s --numeric-owner --no-acls --no-same-owner --no-same-permissions -C %s %s"):format(
-      utils.os_name() == "macOS" and "--disable-copyfile" or "",
-      table.concat(job_opts.compression.additional_opts or {}, " "),
-      parent_dir,
-      table.concat(subdirs, " ")
-    )
-    local command = ("%s | %s"):format(tar_command, ssh_command)
-    return self:run_executor_job(command, job_opts)
-  else
+  -- Prompt the user for transfer method
+  local use_rsync = vim.fn.input("Use rsync for file transfer? (y/n): ") == "y"
+
+  local transfer_command
+  if use_rsync then
+    -- rsync command
     local remotePath = ("%s:%s"):format(self.host, remoteDestPath)
-    local scp_command = ("%s %s %s %s"):format(self.scp_binary, self.scp_conn_opts, localSrcPath, remotePath)
-
-    return self:run_executor_job(scp_command, job_opts)
+    transfer_command = ("%s -avz %s %s %s"):format("rsync", self.scp_conn_opts, localSrcPath, remotePath)
+  else
+    -- scp command
+    local remotePath = ("%s:%s"):format(self.host, remoteDestPath)
+    transfer_command = ("%s %s %s %s"):format(self.scp_binary, self.scp_conn_opts, localSrcPath, remotePath)
   end
+
+  -- Log the command being executed
+  self.logger.info(("Executing Transfer Command: %s"):format(transfer_command))
+
+  -- Execute the transfer command
+  return self:run_executor_job(transfer_command, job_opts)
 end
 
 ---Download data from remote path to local path
