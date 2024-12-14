@@ -4,7 +4,7 @@ local utils = require("remote-nvim.utils")
 ---@class remote-nvim.providers.ssh.SSHExecutor: remote-nvim.providers.Executor
 ---@field super remote-nvim.providers.Executor
 ---@field ssh_conn_opts string Connection options for SSH command
----@field scp_connection_options string Connection options to SCP command
+---@field scp_connection_options string Connection options for SCP command
 ---@field ssh_binary string Binary to use for SSH operations
 ---@field scp_binary string Binary to use for SCP operations
 ---@field private _ssh_prompts remote-nvim.config.PluginConfig.SSHConfig.SSHPrompt[] SSH prompts registered for processing for input
@@ -28,6 +28,9 @@ function SSHExecutor:init(host, conn_opts)
 
   self._job_stdout_processed_idx = 0
   self._job_prompt_responses = {}
+
+  -- Initialize logger
+  self.logger = remote_neovim.config.logger or utils.get_logger()
 end
 
 ---Reset ssh executor
